@@ -211,7 +211,13 @@ class Listener(seiscomp3.Client.Application):
             sout += "%6.2f|" % ed['depth']
             sout += "%s|" % ed['ts']
             sout += "%s|" % ed['ot']
-            sout += "%6.2f|" % ed['likelihood']
+            
+            #######################################################
+            sout += "%6.2f|" % ed['likelihood'] 
+            # DOES FINDER HAS SOMETHING EQUIVALENT TO LIKELYHOOD ? 
+            # See more discussion elements further down
+            #######################################################
+            
             sout += "%11d|" % ed['nstorg']
             sout += "%10d\n" % ed['nstmag']
 
@@ -234,9 +240,16 @@ class Listener(seiscomp3.Client.Application):
         Generate an origin->magnitude lookup table.
         """
         try:
+            
+            ################################
             if magnitude.type() == 'MVS':
+                # ADD Mfd CASE HERE
+                # it shouldnt be different ?
+                ############################
+                
                 seiscomp3.Logging.debug("Received MVS magnitude for origin %s" % parentID)
                 self.origin_lookup[magnitude.publicID()] = parentID
+                
         except:
             info = traceback.format_exception(*sys.exc_info())
             for i in info: sys.stderr.write(i)
@@ -256,6 +269,13 @@ class Listener(seiscomp3.Client.Application):
         """
         Add picks to the cache.
         """
+        
+        #############################################################################
+        # NO PICKS IN SCFINDER (SEE FURTHER DOWN)
+        # double that won't be a problem for EEWD (it should be for scvsmaglog)
+        # or add picks to scfinder (with large uncertaincies and envelope amplitudes)
+        #############################################################################
+        
         try:
             seiscomp3.Logging.debug("Received pick %s" % pk.publicID())
             self.cache.feed(pk)
@@ -371,7 +391,12 @@ class Listener(seiscomp3.Client.Application):
                     self.event_dict[evID]['updates'][updateno]['lon'] = org.longitude().value()
                     self.event_dict[evID]['updates'][updateno]['depth'] = org.depth().value()
                     self.event_dict[evID]['updates'][updateno]['nstorg'] = org.arrivalCount()
+                    
+                    ##################################################
                     self.event_dict[evID]['updates'][updateno]['nstmag'] = mag.stationCount()
+                    # CHECK IF THIS FIELD IS POPULATED, SUSPECTING YES
+                    ##################################################
+                    
                     try:
                         self.event_dict[evID]['updates'][updateno]['ts'] = \
                         mag.creationInfo().modificationTime().toString("%FT%T.%4fZ")
@@ -419,7 +444,16 @@ class Listener(seiscomp3.Client.Application):
                     self.event_dict[evID]['updates'][idx]['likelihood'] = float(comment.text())
                     if self.udevt is not None:
                         self.udevt.send(self.udevt.message_encoder(ep))
+                        
+        ######################################################################################
         except:
+            # TWO POSSIBILITIES:
+            # 1 - CHANGE THE CODE TO LOG WITHOUT LIKELYHOOD 
+            #     any incoming magnitudes will be logged if they are fast enough
+            # 2 - OR ADD LIKEHOOD TO SCFINDER's ORIGINS
+            #     could be done using finder's PDF?
+            ##################################################################################
+            
             info = traceback.format_exception(*sys.exc_info())
             for i in info: seiscomp3.Logging.error(i)
 
